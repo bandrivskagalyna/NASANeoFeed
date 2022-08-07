@@ -1,0 +1,9 @@
+/target/
+/.idea/
+/bin/
+
+# Idea maven files
+*.iml
+
+# Compiled class file
+*.class
