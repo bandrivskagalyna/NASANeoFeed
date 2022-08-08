@@ -20,21 +20,23 @@ import static org.hamcrest.Matchers.notNullValue;
 public class NeoFeedTest extends BaseTest {
 
     private String endpointUrl;
-    private String startDate;
-    private String endDate;
+    private LocalDate startDate;
+    private LocalDate endDate;
 
     @BeforeClass
     public void initClass() throws Exception {
-        endpointUrl = httpHelper.buildEndpointUrl("neo/rest/v1/feed");
-        startDate = dateHelper.convertDateToString(LocalDate.of(2015, 9, 1));
-        endDate = dateHelper.convertDateToString(LocalDate.of(2015, 9, 8));
+        endpointUrl = getHttpHelper().buildEndpointUrl("neo/rest/v1/feed");
+        startDate = LocalDate.of(2015, 9, 1);
+        endDate = LocalDate.of(2015, 9, 8);
     }
 
     @Test
     public void testSuccessful() {
+        String startDateStr = getDateHelper().convertDateToString(startDate);
+        String endDateStr = getDateHelper().convertDateToString(endDate);
         LinkedHashMap nearEarthObjectsMap = RestAssured.given()
-                .queryParam("start_date", startDate)
-                .queryParam("end_date", endDate)
+                .queryParam("start_date", startDateStr)
+                .queryParam("end_date", endDateStr)
                 .queryParam("api_key", HttpHelper.apiKey)
                 .when().get(endpointUrl).then()
                 .assertThat().statusCode(HttpStatus.SC_OK)
@@ -45,25 +47,26 @@ public class NeoFeedTest extends BaseTest {
                 .extract()
                 .path("near_earth_objects");
 
-        Assert.assertNotNull(nearEarthObjectsMap.get(startDate));
-        Assert.assertNotNull(nearEarthObjectsMap.get(endDate));
+        Assert.assertNotNull(nearEarthObjectsMap.get(startDateStr));
+        Assert.assertNotNull(nearEarthObjectsMap.get(endDateStr));
     }
 
     @Test
     public void testInvalidAPIKey() throws Exception {
-        Map<String, String> paramMap = httpHelper.buildParameterMap("invalid api key", startDate, endDate);
+        Map<String, String> paramMap = getHttpHelper().buildParameterMap("invalid api key",
+                getDateHelper().convertDateToString(startDate), getDateHelper().convertDateToString(endDate));
 
-        Response response = super.doGetRequest(endpointUrl, paramMap);
+        Response response = getHttpHelper().doGetRequest(endpointUrl, paramMap);
 
         Assert.assertEquals(response.getStatusCode(), HttpStatus.SC_FORBIDDEN);
-        Assert.assertEquals(httpHelper.getErrorCode(response), ErrorMessage.INVALID_API_KEY);
+        Assert.assertEquals(getHttpHelper().getErrorCode(response), ErrorMessage.INVALID_API_KEY);
     }
 
     @Test
     public void testInvalidDateFormat() {
         String invalidDate = "dddd-dd-dd";
-        Map<String, String> paramMap = httpHelper.buildParameterMap(startDate, invalidDate);
-        Response response = super.doGetRequest(endpointUrl, paramMap);
+        Map<String, String> paramMap = getHttpHelper().buildParameterMap(getDateHelper().convertDateToString(startDate), invalidDate);
+        Response response = getHttpHelper().doGetRequest(endpointUrl, paramMap);
 
         Assert.assertEquals(response.getStatusCode(), HttpStatus.SC_BAD_REQUEST);
 
@@ -73,9 +76,9 @@ public class NeoFeedTest extends BaseTest {
 
     @Test
     public void testExceededFeedDateLimit() {
-        String exceededDate = dateHelper.convertDateToString(LocalDate.of(2022, 9, 8));
-        Map<String, String> paramMap = httpHelper.buildParameterMap(startDate, exceededDate);
-        Response response = super.doGetRequest(endpointUrl, paramMap);
+        Map<String, String> paramMap = getHttpHelper().buildParameterMap(getDateHelper().convertDateToString(startDate),
+                getDateHelper().convertDateToString(startDate.plusDays(10)));
+        Response response = getHttpHelper().doGetRequest(endpointUrl, paramMap);
 
         Assert.assertEquals(response.getStatusCode(), HttpStatus.SC_BAD_REQUEST);
 
@@ -86,9 +89,60 @@ public class NeoFeedTest extends BaseTest {
     @Test
     @Ignore("BUG: Start date and End date switched after sending request")
     public void testStartDateAfterEndDate() {
-        Map<String, String> paramMap = httpHelper.buildParameterMap(endDate, startDate);
-        Response response = super.doGetRequest(endpointUrl, paramMap);
+        Map<String, String> paramMap = getHttpHelper().buildParameterMap(getDateHelper().convertDateToString(endDate),
+                getDateHelper().convertDateToString(startDate));
+        Response response = getHttpHelper().doGetRequest(endpointUrl, paramMap);
 
         Assert.assertEquals(response.getStatusCode(), HttpStatus.SC_BAD_REQUEST);
     }
+
+    @Test
+    public void testAbsentDateParametersReturnsDataForUpcomingWeek() {
+        Map<String, String> paramMap = getHttpHelper().buildParameterMap(null, null);
+        Response response = getHttpHelper().doGetRequest(endpointUrl, paramMap);
+
+        Assert.assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
+
+        LocalDate today = getDateHelper().getCurrentLocalDateInUTC();
+        LocalDate endDate = today.plusDays(7);
+
+        String startDateDefault = getDateHelper().convertDateToString(today);
+        String endDateDefault = getDateHelper().convertDateToString(endDate);
+
+        String body = response.getBody().asString();
+        Assert.assertTrue(body.contains(startDateDefault));
+        Assert.assertTrue(body.contains(endDateDefault));
+    }
+
+    @Test
+    @Ignore("BUG: Should be either valid response with start date= end date-7 or more specific error like 'Start date parameter is missing'")
+    public void testAbsentStartDateParameter() {
+        Map<String, String> paramMap = getHttpHelper().buildParameterMap(null, getDateHelper().convertDateToString(endDate));
+        Response response = getHttpHelper().doGetRequest(endpointUrl, paramMap);
+
+        Assert.assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
+
+        String startDateDefault = getDateHelper().convertDateToString(endDate.minusDays(7));
+        String endDateStr = getDateHelper().convertDateToString(endDate);
+
+        String body = response.getBody().asString();
+        Assert.assertTrue(body.contains(startDateDefault));
+        Assert.assertTrue(body.contains(endDateStr));
+    }
+
+    @Test
+    public void testAbsentEndDateParameter() {
+        Map<String, String> paramMap = getHttpHelper().buildParameterMap(getDateHelper().convertDateToString(startDate), null);
+        Response response = getHttpHelper().doGetRequest(endpointUrl, paramMap);
+
+        Assert.assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
+
+        String startDateStr = getDateHelper().convertDateToString(startDate);
+        String endDateDefault = getDateHelper().convertDateToString(startDate.plusDays(7));
+
+        String body = response.getBody().asString();
+        Assert.assertTrue(body.contains(startDateStr));
+        Assert.assertTrue(body.contains(endDateDefault));
+    }
+
 }

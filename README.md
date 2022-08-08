@@ -1,6 +1,8 @@
 # NASA NEO Feed Example
 
-Project contains test for the Neo feed endpoint which is retreiving a list of Asteroids based on their closest approach date to Earth. GET https://api.nasa.gov/neo/rest/v1/feed?start_date=START_DATE&end_date=END_DATE&api_key=API_KEY
+Project contains tests for Neo feed endpoint which retrieves a list of Asteroids based on their closest approach date to Earth.
+
+`GET https://api.nasa.gov/neo/rest/v1/feed?start_date=START_DATE&end_date=END_DATE&api_key=API_KEY`
 
 ## Setup requirements
 
@@ -13,14 +15,15 @@ Using Maven
 mvn clean install
 ```
 
-## Note
+## Notes
 
-- For demo purpose I wrote one test with RestAssured asserts and rest with TestNG asserts.
+- For demo purpose I wrote one test with RestAssured asserts and all others with TestNG asserts.
 
-- Test NeoFeedTest.testStartDateAfterEndDate  will fail due to an actual bug (When start date and end date parameters are within 7 days limit but swiched places the API returns 200 result and in response those dates automatically swiched to be correct, but I thinj this is a bug because it alteres request and in case something heppens request cannot be traced). Test was ignored.
+- Test NeoFeedTest.testStartDateAfterEndDate will fail due to actual bug (When start date and end date parameters are within 7 days limit but end date is before the start date - the API returns 200 result and in response those dates automatically switched to the right order, but I believe this is a bug because it silently alters the request and such error could not be traced). Test was ignored.
 
+- Test NeoFeedTest.testAbsentStartDateParameter will fail due to bug (on my opinion , should be either valid response with start date= end date-7 or more specific error like 'Start date parameter is missing'. Need more clarification on this). Test was ignored
 
-- Also Error response structure are not the same (probably because they are from different services, but still it would be better if they have similar structure. 
+- Error response JSON structure is not the same for different errors (probably because they are from different services, but still it would be better if they follow similar structure). 
 
    Error response when API key is not valid
 ```bash
@@ -31,7 +34,7 @@ mvn clean install
   }
 }
 ```
-   Error response when feed date limit exceeded:
+   Error response when feed date limit is exceeded:
 ```bash
 {
     "code": 400,
@@ -40,13 +43,3 @@ mvn clean install
     "request": "http://www.neowsapp.com/rest/v1/feed?start_date=2015-09-10&end_date=2015-09-20"
 }
 ```
-
-- Also I didn't add few test due to I didn't know expected behavior. But seems the results are not accurate:
-1. Set start and end date parameters to future dates returns data results with future dates in it
-Ex. https://api.nasa.gov/neo/rest/v1/feed?start_date=2090-08-20&end_date=2090-08-24&api_key=NW9PHugtaKeZ7O9QynbOpsz1zWspPClZ9v4ZQXcT
-
-2. If start and end dates are not set than system automatically sets date from today plus 7 days:
-Ex. request :
-   https://api.nasa.gov/neo/rest/v1/feed?api_key=NW9PHugtaKeZ7O9QynbOpsz1zWspPClZ9v4ZQXcT
-Auto generated request will be:
-  http://www.neowsapp.com/rest/v1/feed?start_date=2022-08-07&end_date=2022-08-14&detailed=false&api_key=NW9PHugtaKeZ7O9QynbOpsz1zWspPClZ9v4ZQXcT
